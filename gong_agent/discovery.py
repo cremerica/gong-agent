@@ -19,7 +19,7 @@ account whose agreed cadence isn't the default.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from gong_agent.gong_client import CallRecord, GongClient
 
@@ -39,7 +39,7 @@ def discovery_window(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> tuple[str, s
     window - every discovered account uses this same window; there is no
     per-account "POC start date" available from Gong to do better than a
     fixed lookback (see plan discussion)."""
-    until = datetime.utcnow().date()
+    until = datetime.now(timezone.utc).date()
     since = until - timedelta(days=lookback_days)
     return since.isoformat(), until.isoformat()
 
