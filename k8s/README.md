@@ -12,9 +12,10 @@ a self-contained example of that "bring your own image" path.
 - A GKE cluster and a `kubectl` context pointed at it (`gcloud container
   clusters get-credentials <cluster> --zone <zone> --project <project>`).
 - The worker image, already built from this repo's `Dockerfile` and pushed
-  somewhere your cluster can pull from. This example uses
-  `cremerfc/ai-agent-gongy:latest` (public on Docker Hub) - swap
-  `image:` in `deployment.yaml` if you build and push your own.
+  somewhere your cluster can pull from - see "Build and push the image"
+  below. This example uses `cremerfc/ai-agent-gongy` (public on Docker Hub),
+  pinned by digest in `deployment.yaml` - swap `image:` if you build and
+  push your own.
 - An agent registered in AgentOps (the Add Agent wizard, framework
   "Something else") with a minted worker token. Its `agent_id` must match
   `AGENTOPS_AGENT_ID` in `deployment.yaml` (currently `fernandos-outside-agent`)
@@ -26,13 +27,30 @@ a self-contained example of that "bring your own image" path.
 
 ## Build and push the image
 
-GKE's standard node pools run `linux/amd64`. `docker build` targets your
-local machine's architecture by default, so building on Apple Silicon (or
-any arm64 machine) produces an `arm64` image that fails on those nodes with
-an `exec format error` / `CrashLoopBackOff` - it's not a Kubernetes config
-issue, the binary just can't run on the node's CPU architecture. Build with
-`buildx` and target `linux/amd64` explicitly (add `,linux/arm64` too if you
-also want to run the same image tag locally on an Apple Silicon machine):
+`.github/workflows/build-and-push.yml` builds and pushes the image
+automatically on every push to `main` (or on demand via the Actions tab's
+"Run workflow" button) - `linux/amd64` only, matching GKE's standard node
+pools, so there's no local architecture pitfall to worry about. It needs two
+repo secrets (Settings -> Secrets and variables -> Actions):
+
+- `DOCKERHUB_USERNAME` - a Docker Hub username with push access to the image
+- `DOCKERHUB_TOKEN` - a Docker Hub access token (not your account password)
+
+Each run's job summary prints the resulting `image@sha256:...` digest -
+paste that into `deployment.yaml`'s `image:` field (replacing
+`REPLACE_WITH_DIGEST_FROM_CI` on first setup) and `kubectl apply -f k8s/` (or
+`rollout restart`, see "Updating" below) to deploy it. Pinning by digest
+instead of `:latest` means the manifest always names the exact image that
+was tested/reviewed, and a compromised or overwritten `:latest` tag on
+Docker Hub can't silently change what's running in the cluster.
+
+For a local/manual build instead of CI - e.g. testing a change before it's
+merged - `docker build` targets your local machine's architecture by
+default, so building on Apple Silicon (or any arm64 machine) produces an
+`arm64` image that fails on GKE nodes with an `exec format error` /
+`CrashLoopBackOff`. Use `buildx` and target `linux/amd64` explicitly (add
+`,linux/arm64` too if you also want to run the same image tag locally on an
+Apple Silicon machine):
 
 ```sh
 docker buildx build --platform linux/amd64 -t cremerfc/ai-agent-gongy:latest --push .
@@ -40,7 +58,11 @@ docker buildx build --platform linux/amd64 -t cremerfc/ai-agent-gongy:latest --p
 
 `--push` publishes directly (a multi-platform build can't be `docker load`ed
 into the local daemon, so there's no separate `docker push` step). Swap the
-tag for your own registry if you're not using `cremerfc/ai-agent-gongy`.
+tag for your own registry if you're not using `cremerfc/ai-agent-gongy`. A
+manual push like this still lands on the mutable `:latest` tag - grab its
+digest from Docker Hub (or `docker inspect --format '{{index .RepoDigests 0}}'
+cremerfc/ai-agent-gongy:latest` right after the push) if you want to deploy
+it the same pinned way.
 
 ## Deploy
 
@@ -73,11 +95,13 @@ schedule, and it can be invoked on demand from Fleet or Chat.
 
 ## Updating
 
-The Deployment pulls `:latest` on every restart (`imagePullPolicy: Always`),
-so after pushing a new image:
+The Deployment is pinned to an image digest (`imagePullPolicy: IfNotPresent`),
+so a plain `rollout restart` won't pick up a new build on its own - after
+CI pushes a new image, edit `deployment.yaml`'s `image:` to the digest from
+that run's job summary, then re-apply:
 
 ```sh
-kubectl -n gong-poc-health rollout restart deployment/gong-poc-health-worker
+kubectl apply -f k8s/deployment.yaml
 ```
 
 ## Rotating the worker token
