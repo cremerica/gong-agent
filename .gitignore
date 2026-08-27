@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Contains real quotes from prospect calls - not committed until you decide
+# how you want this handled (private repo, retention policy, etc).
+reports/
+
+# Local agentops-run-worker output (see README "Run").
+artifacts/
+output.json

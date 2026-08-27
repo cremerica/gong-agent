@@ -1,0 +1,10 @@
+# Optional. Accounts are auto-discovered from Gong's Salesforce CRM context
+# (see gong_agent/discovery.py) - every account currently in the
+# "Evaluation POC" Opportunity stage is picked up automatically, no config
+# needed here for that.
+#
+# This file only overrides the expected sync-call cadence (in days) for an
+# account whose agreed cadence isn't the default (7 days). Match the
+# account name as it appears in Salesforce.
+
+Telconet: 14

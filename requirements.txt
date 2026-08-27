@@ -1,0 +1,4 @@
+anthropic>=0.68.0
+requests>=2.31.0
+PyYAML>=6.0
+komodor-agentops  # TODO: pin a version once confirmed against the SDK's published releases

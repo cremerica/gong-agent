@@ -1,0 +1,51 @@
+# Plain Deployment - deliberately not the agentops-agent-base helm chart.
+# That chart is a config-driven *Claude Code* worker (it requires a prompt,
+# mounts CLAUDE.md/skills/subagents into an AgentOps-authored image) - it has
+# no way to run arbitrary custom code. This worker is a from-scratch agent
+# (custom Gong discovery + a hand-rolled Anthropic Messages API loop, see
+# gong_agent/), so it just needs to run as a normal long-lived pod with two
+# env vars the SDK requires (AGENTOPS_URL, AGENTOPS_WORKER_TOKEN) - see
+# k8s/README.md and https://agentops.komodor.com/docs/agents/building-your-own-agent.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gong-poc-health-worker
+  namespace: gong-poc-health
+  labels:
+    app: gong-poc-health-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gong-poc-health-worker
+  template:
+    metadata:
+      labels:
+        app: gong-poc-health-worker
+    spec:
+      containers:
+        - name: worker
+          image: cremerfc/ai-agent-gongy:latest
+          imagePullPolicy: Always
+          env:
+            - name: AGENTOPS_URL
+              value: "https://agentops.komodor.com"
+            # Must match the agent_id the worker token below was minted for
+            # (see agent-spec.yaml and the Add Agent wizard).
+            - name: AGENTOPS_AGENT_ID
+              value: "fernandos-outside-agent"
+            - name: AGENTOPS_WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gong-poc-health-worker-token
+                  key: token
+          # No ports/probes: the worker dials out to the control plane and
+          # heartbeats over that connection - it binds no port and serves
+          # nothing, so there's no listener to expose or health-check.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 750m
+              memory: 1Gi

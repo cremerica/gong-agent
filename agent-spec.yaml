@@ -1,0 +1,37 @@
+schema_version: 1
+agent_id: fernandos-outside-agent
+name: Gong POC Health
+description: >-
+  Reviews a prospect account's Gong call history against Komodor's ROE
+  playbook and reports POC health, gaps, and open follow-up commitments.
+owner: <team>  # TODO: fill in the owning team
+repo: https://github.com/placeholder-org/gong-agent  # TODO: replace once this project is pushed to a real git remote
+source_path: .
+
+labels:
+  category: sales-engineering
+
+input_schema:
+  type: object
+  properties:
+    account:
+      type: string
+      description: >-
+        Restrict this run to one discovered account (matched by Salesforce
+        Account name). Omit to process every account currently in the
+        "Evaluation POC" stage.
+    se_email:
+      type: string
+      description: >-
+        Scope to accounts where this email is an internal call participant
+        (IC mode). Omit for manager mode (every account in POC, org-wide).
+  required: []
+
+default_input:
+  prompt: ""
+
+triggers:
+  - id: weekly-poc-health
+    type: schedule
+    name: Weekly POC health report
+    cron: "0 13 * * 1"  # Monday 13:00 UTC - matches the prior GitHub Actions schedule
