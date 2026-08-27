@@ -5,7 +5,7 @@ description: >-
   Reviews a prospect account's Gong call history against Komodor's ROE
   playbook and reports POC health, gaps, and open follow-up commitments.
 owner: <team>  # TODO: fill in the owning team
-repo: https://github.com/placeholder-org/gong-agent  # TODO: replace once this project is pushed to a real git remote
+repo: https://github.com/cremerica/gong-agent
 source_path: .
 
 labels:
