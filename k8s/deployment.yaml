@@ -25,15 +25,14 @@ spec:
     spec:
       containers:
         - name: worker
-          # Pinned by digest, not the mutable :latest tag - see
-          # .github/workflows/build-and-push.yml, which builds this image on
-          # every push to main and prints the digest to replace here in its
-          # job summary (Actions tab -> latest run -> Summary).
-          image: cremerfc/ai-agent-gongy@sha256:REPLACE_WITH_DIGEST_FROM_CI
-          # Safe to use IfNotPresent now that the tag is an immutable digest
-          # (a digest can't drift the way :latest can, so there's no need to
-          # force a re-pull on every restart).
-          imagePullPolicy: IfNotPresent
+          # TODO: pin back to an immutable digest via CI once iteration settles -
+          # see .github/workflows/build-and-push.yml, which builds this image on
+          # every push to main and prints the digest to use here.
+          image: cremerfc/ai-agent-gongy:1.3
+          # checks only whether the node has *an* image for this name:tag, not
+          # whether it's current, so it silently keeps serving a stale cached
+          # image (as it did here) even after a fresh push and pod delete.
+          imagePullPolicy: Always
           env:
             - name: AGENTOPS_URL
               value: "https://agentops.komodor.com"

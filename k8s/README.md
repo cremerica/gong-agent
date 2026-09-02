@@ -20,10 +20,12 @@ a self-contained example of that "bring your own image" path.
   "Something else") with a minted worker token. Its `agent_id` must match
   `AGENTOPS_AGENT_ID` in `deployment.yaml` (currently `fernandos-outside-agent`)
   and `agent-spec.yaml`'s `agent_id`.
-- `GONG_ACCESS_KEY`, `GONG_ACCESS_KEY_SECRET`, and `ANTHROPIC_API_KEY` bound
-  as credentials on that agent in AgentOps (Settings → Agents). The handler
-  pulls these per run via `apply_secret_to_env` - they're never stored in the
-  cluster.
+- `gong-username`, `gong-password`, and `ANTHROPIC_API_KEY` bound as
+  credentials on that agent in AgentOps (Settings → Agents) - `gong-username`/
+  `gong-password` are the Gong Access Key/Secret, named to match credentials
+  another agent already had bound (AgentOps doesn't allow the same
+  credential under two names). The handler pulls these per run via
+  `get_secret`/`apply_secret_to_env` - they're never stored in the cluster.
 
 ## Build and push the image
 

@@ -70,9 +70,16 @@ def discover_poc_accounts(
     for call in matched:
         if not call.crm_account_name:
             continue  # can't group without an account identifier
-        key = call.crm_account_id or call.crm_account_name.lower()
+        # Keyed by name, not crm_account_id: Gong's CRM context doesn't
+        # reliably attach an account id to every call for the same account,
+        # and an id-preferring key used to split one account into two
+        # groups (and two identically-named report artifacts) whenever some
+        # of its calls had the id and others didn't.
+        key = call.crm_account_name.strip().lower()
         if key not in groups:
             groups[key] = DiscoveredAccount(account_name=call.crm_account_name, crm_account_id=call.crm_account_id)
+        elif not groups[key].crm_account_id and call.crm_account_id:
+            groups[key].crm_account_id = call.crm_account_id
         groups[key].calls.append(call)
 
     return sorted(groups.values(), key=lambda a: a.account_name)
