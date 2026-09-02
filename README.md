@@ -64,13 +64,17 @@ helm chart, which is a config-driven *Claude Code* worker (it requires a prompt 
 config into an AgentOps-authored image; there's no supported way to hand it custom code). See
 [`k8s/`](k8s/) for the manifests and full deploy steps - short version:
 
-1. Build and push the image from the included `Dockerfile` (this example uses
-   `cremerfc/ai-agent-gongy:latest`).
+1. `.github/workflows/build-and-push.yml` builds and pushes the image (this example uses
+   `cremerfc/ai-agent-gongy`) on every push to `main`, then prints the resulting digest in its job
+   summary - paste that into `k8s/deployment.yaml`'s `image:` field. See `k8s/README.md` for the
+   required repo secrets and the manual/local build fallback.
 2. Mint a worker token from the Add Agent wizard in AgentOps (framework: "Something else") and
    create it as a Secret in-cluster - see `k8s/README.md`.
-3. Bind `GONG_ACCESS_KEY`, `GONG_ACCESS_KEY_SECRET`, and `ANTHROPIC_API_KEY` as credentials on the
-   agent in AgentOps (Settings → Agents) - the handler pulls them per run via `apply_secret_to_env`,
-   no repo, CI, or cluster secrets involved for these three.
+3. Bind `gong-username`, `gong-password`, and `ANTHROPIC_API_KEY` as credentials on the agent in
+   AgentOps (Settings → Agents) - `gong-username`/`gong-password` are the Gong Access Key/Secret,
+   named to match credentials another agent already had bound under those names (AgentOps doesn't
+   allow the same credential under two names). The handler pulls them per run via `get_secret`/
+   `apply_secret_to_env`, no repo, CI, or cluster secrets involved for these three.
 4. `kubectl apply -f k8s/`. Once the worker is heartbeating, it's live in Fleet: its
    `weekly-poc-health` cron trigger fires on schedule, and it can also be invoked on demand from
    Fleet or Chat to test before trusting the schedule.

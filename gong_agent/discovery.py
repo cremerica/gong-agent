@@ -19,7 +19,7 @@ account whose agreed cadence isn't the default.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from gong_agent.gong_client import CallRecord, GongClient
 
@@ -39,7 +39,7 @@ def discovery_window(lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> tuple[str, s
     window - every discovered account uses this same window; there is no
     per-account "POC start date" available from Gong to do better than a
     fixed lookback (see plan discussion)."""
-    until = datetime.utcnow().date()
+    until = datetime.now(timezone.utc).date()
     since = until - timedelta(days=lookback_days)
     return since.isoformat(), until.isoformat()
 
@@ -70,9 +70,16 @@ def discover_poc_accounts(
     for call in matched:
         if not call.crm_account_name:
             continue  # can't group without an account identifier
-        key = call.crm_account_id or call.crm_account_name.lower()
+        # Keyed by name, not crm_account_id: Gong's CRM context doesn't
+        # reliably attach an account id to every call for the same account,
+        # and an id-preferring key used to split one account into two
+        # groups (and two identically-named report artifacts) whenever some
+        # of its calls had the id and others didn't.
+        key = call.crm_account_name.strip().lower()
         if key not in groups:
             groups[key] = DiscoveredAccount(account_name=call.crm_account_name, crm_account_id=call.crm_account_id)
+        elif not groups[key].crm_account_id and call.crm_account_id:
+            groups[key].crm_account_id = call.crm_account_id
         groups[key].calls.append(call)
 
     return sorted(groups.values(), key=lambda a: a.account_name)

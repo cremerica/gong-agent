@@ -6,7 +6,7 @@ commitment list via record_commitment. finalize_report flips `finalized`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from gong_agent.gong_client import CallRecord
 
@@ -25,7 +25,7 @@ COMMITMENT_STATUSES = {"open", "confirmed_done"}
 
 
 def compute_cadence_gap(calls: list[CallRecord], expected_cadence_days: int, today: date | None = None) -> dict:
-    today = today or datetime.utcnow().date()
+    today = today or datetime.now(timezone.utc).date()
     if not calls:
         return {
             "status": "no_data",

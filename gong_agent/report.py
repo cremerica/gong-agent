@@ -8,7 +8,7 @@ structured output regardless of how or when the agent loop ends.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from gong_agent.agent_loop import RunResult
 from gong_agent.config import AccountConfig
@@ -53,7 +53,7 @@ def _cadence_line(cadence: dict) -> str:
 
 
 def build_zero_calls_report(account: AccountConfig, since_date: str, until_date: str) -> str:
-    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         f"# POC Health Report - {account.account_name}",
         "",
@@ -84,7 +84,7 @@ def build_zero_calls_report(account: AccountConfig, since_date: str, until_date:
 
 
 def build_report(account: AccountConfig, run_result: RunResult, since_date: str, until_date: str) -> str:
-    generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     cadence = compute_cadence_gap(run_result.store.calls, account.expected_cadence_days)
 
     lines = [

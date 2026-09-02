@@ -12,6 +12,7 @@ import os
 from dataclasses import dataclass, field
 
 import anthropic
+from komodor_agentops import observe, record_usage
 
 from gong_agent.account_data import AccountDataStore
 from gong_agent.config import AccountConfig
@@ -37,6 +38,18 @@ class RunResult:
     finalized: bool
     final_stop_reason: str | None
     usage_per_turn: list[dict] = field(default_factory=list)
+
+
+@observe(name="messages.create", as_type="llm")
+def _create_message(client: anthropic.Anthropic, **kwargs) -> anthropic.types.Message:
+    return client.beta.messages.create(**kwargs)
+
+
+def _dispatch_observed(name: str, tool_input: dict, ctx: ToolContext) -> tuple[str, bool]:
+    """dispatch(), wrapped per call so each tool shows up in AgentOps under its own name -
+    observe()'s span name is fixed at decoration time, so a single @observe on dispatch
+    itself would report every tool call as "dispatch" instead of e.g. "search_calls"."""
+    return observe(name=name, as_type="tool")(dispatch)(name, tool_input, ctx)
 
 
 def _initial_user_message(account: AccountConfig, call_count: int, since_date: str, until_date: str) -> str:
@@ -71,7 +84,8 @@ def run_agent(store: AccountDataStore, since_date: str, until_date: str,
 
     for turn in range(1, MAX_TURNS + 1):
         turn_count = turn
-        response = client.beta.messages.create(
+        response = _create_message(
+            client,
             model=MODEL,
             max_tokens=MAX_TOKENS_PER_TURN,
             betas=[CONTEXT_MANAGEMENT_BETA],
@@ -81,13 +95,19 @@ def run_agent(store: AccountDataStore, since_date: str, until_date: str,
             output_config={"effort": "medium"},
             context_management={"edits": [{"type": "clear_tool_uses_20250919"}]},
         )
-        usage_per_turn.append({
-            "turn": turn,
+        usage_payload = {
+            "provider": "anthropic",
+            "model": response.model or MODEL,
             "input_tokens": response.usage.input_tokens,
             "output_tokens": response.usage.output_tokens,
             "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0),
             "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0),
-        })
+        }
+        usage_per_turn.append({"turn": turn, **usage_payload})
+        # Reports this turn's usage to AgentOps (runs.usage_json) - a raw
+        # Messages API call like this one has no framework adapter to do it
+        # automatically, unlike the Claude Agent SDK/LangChain/ADK paths.
+        record_usage(usage_payload, emit_event=True)
         messages.append({"role": "assistant", "content": response.content})
         final_stop_reason = response.stop_reason
 
@@ -100,7 +120,7 @@ def run_agent(store: AccountDataStore, since_date: str, until_date: str,
         tool_results = []
         for block in response.content:
             if block.type == "tool_use":
-                content_str, is_error = dispatch(block.name, block.input, ctx)
+                content_str, is_error = _dispatch_observed(block.name, block.input, ctx)
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,

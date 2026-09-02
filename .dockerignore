@@ -1,0 +1,14 @@
+.git/
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Contains real quotes from prospect calls - never bake into an image that
+# gets pushed to a registry (see k8s/README.md - the build target is public).
+reports/
+artifacts/
+output.json
+
+*.pdf

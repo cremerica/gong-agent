@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from komodor_agentops import AgentOpsWorker, AgentSpec, apply_secret_to_env, observe
+from komodor_agentops import AgentOpsWorker, AgentSpec, apply_secret_to_env, get_secret, observe
 from komodor_agentops.worker import Run
 
 from gong_agent.account_data import AccountDataStore
@@ -73,17 +73,22 @@ def _process_account(discovered: DiscoveredAccount, gong_client: GongClient, cad
 
 async def handler(run: Run) -> dict[str, Any]:
     # Per-run bound credentials - see "Secrets and credentials" in the docs.
-    apply_secret_to_env("GONG_ACCESS_KEY")
-    apply_secret_to_env("GONG_ACCESS_KEY_SECRET")
+    # The Gong credentials are bound in AgentOps under "gong-username" /
+    # "gong-password" (shared names already used by another agent - AgentOps
+    # doesn't allow the same credential under two names), so these are
+    # fetched by name rather than via apply_secret_to_env, which assumes the
+    # credential name and the env var it lands in are the same string.
     apply_secret_to_env("ANTHROPIC_API_KEY")
+    gong_access_key = get_secret("gong-username") or os.environ["GONG_ACCESS_KEY"]
+    gong_access_key_secret = get_secret("gong-password") or os.environ["GONG_ACCESS_KEY_SECRET"]
 
     account_filter = run.input.get("account")
     se_email = run.input.get("se_email") or os.environ.get("SE_EMAIL")
     since_date, until_date = discovery_window(DEFAULT_LOOKBACK_DAYS)
 
     gong_client = GongClient(
-        access_key=os.environ["GONG_ACCESS_KEY"],
-        access_key_secret=os.environ["GONG_ACCESS_KEY_SECRET"],
+        access_key=gong_access_key,
+        access_key_secret=gong_access_key_secret,
     )
 
     mode = f"IC mode ({se_email})" if se_email else "manager mode (all accounts in POC)"
@@ -102,7 +107,7 @@ async def handler(run: Run) -> dict[str, Any]:
     for d in discovered:
         try:
             account, report_md, summary = _process_account(d, gong_client, cadence_overrides, since_date, until_date)
-            await run.upload_artifact(f"{account.slug}/{today}.md", report_md)
+            await run.upload_artifact(name=f"{account.slug}/{today}.md", content=report_md)
             summaries.append(summary)
             digest_sections.append(
                 f"## {account.account_name}\n\n"
